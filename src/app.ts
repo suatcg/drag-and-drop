@@ -1,3 +1,16 @@
+// Drag & Drop Interfaces
+
+interface Draggable {
+	dragStartHandler(event: DragEvent): void;
+	dragEndHandler(event: DragEvent): void;
+}
+
+interface DragTarget {
+	dragOverHandler(event: DragEvent): void;
+	dropHandler(event: DragEvent): void;
+	dragLeaveHandler(event: DragEvent): void;
+}
+
 // Project Type
 enum ProjectStatus {
 	Active,
@@ -52,6 +65,19 @@ class ProjectState extends State<Project> {
 		);
 
 		this.projects.push(newProject);
+		this.updateListeners();
+	}
+
+	// Change the state and list where currenty in, to new list when item moves
+	moveProject(projectId: string, newStatus: ProjectStatus) {
+		const project = this.projects.find((prj) => prj.id === projectId);
+		if (project && project.status !== newStatus) {
+			project.status = newStatus;
+			this.updateListeners();
+		}
+	}
+
+	private updateListeners() {
 		for (const listenerFn of this.listeners) {
 			listenerFn(this.projects.slice());
 		}
@@ -162,12 +188,62 @@ abstract class Component<T extends HTMLElement, U extends HTMLElement> {
 		);
 	}
 
+	// Force to use the methods when inherited from other class below via abstract methods
+	// Beside you can't have private abstract methods , Typescripte does not allow to use private keywords in abstract methods
 	abstract configure(): void;
 	abstract renderContent(): void;
 }
 
+// Project Item Class
+class ProjectItem
+	extends Component<HTMLUListElement, HTMLLIElement>
+	implements Draggable
+{
+	private project: Project;
+
+	get persons() {
+		if (this.project.people === 1) {
+			return '1 person';
+		} else {
+			return `${this.project.people} persons`;
+		}
+	}
+
+	constructor(hostId: string, project: Project) {
+		super('single-project', hostId, true, project.id);
+		this.project = project;
+
+		this.configure();
+		this.renderContent();
+	}
+
+	@AutoBind
+	dragStartHandler(event: DragEvent) {
+		event.dataTransfer!.setData('text/plain', this.project.id);
+		event.dataTransfer!.effectAllowed = 'move';
+	}
+
+	dragEndHandler(_: DragEvent) {
+		console.log('Drag End');
+	}
+
+	configure() {
+		this.element.addEventListener('dragstart', this.dragStartHandler);
+		this.element.addEventListener('dragend', this.dragEndHandler);
+	}
+
+	renderContent() {
+		this.element.querySelector('h2')!.textContent = this.project.title;
+		this.element.querySelector('h3')!.textContent = this.persons + ' assigned.';
+		this.element.querySelector('p')!.textContent = this.project.description;
+	}
+}
+
 // Project List Class
-class ProjectList extends Component<HTMLDivElement, HTMLElement> {
+class ProjectList
+	extends Component<HTMLDivElement, HTMLElement>
+	implements DragTarget
+{
 	assignedProjects: Project[];
 
 	constructor(private type: 'active' | 'finished') {
@@ -179,7 +255,37 @@ class ProjectList extends Component<HTMLDivElement, HTMLElement> {
 		this.renderContent();
 	}
 
+	@AutoBind
+	dragOverHandler(event: DragEvent) {
+		// Update the List only the text/plain data.
+		if (event.dataTransfer && event.dataTransfer.types[0] === 'text/plain') {
+			// It enables the trigger of the drop event by preventDefault otherwise drop event does not work.
+			event.preventDefault();
+			const listEl = this.element.querySelector('ul')!;
+			listEl.classList.add('droppable');
+		}
+	}
+
+	@AutoBind
+	dropHandler(event: DragEvent) {
+		const prjId = event.dataTransfer!.getData('text/plain');
+		projectState.moveProject(
+			prjId,
+			this.type === 'active' ? ProjectStatus.Active : ProjectStatus.Finished
+		);
+	}
+
+	@AutoBind
+	dragLeaveHandler(_: DragEvent) {
+		const listEl = this.element.querySelector('ul')!;
+		listEl.classList.remove('droppable');
+	}
+
 	configure() {
+		this.element.addEventListener('dragover', this.dragOverHandler);
+		this.element.addEventListener('dragleave', this.dragLeaveHandler);
+		this.element.addEventListener('drop', this.dropHandler);
+
 		projectState.addListener((projects: Project[]) => {
 			const relevantProjects = projects.filter((prj) => {
 				if (this.type === 'active') {
@@ -207,9 +313,7 @@ class ProjectList extends Component<HTMLDivElement, HTMLElement> {
 		listEl.innerHTML = '';
 
 		for (const prjItem of this.assignedProjects) {
-			const listItem = document.createElement('li');
-			listItem.textContent = prjItem.title;
-			listEl.appendChild(listItem);
+			new ProjectItem(this.element.querySelector('ul')!.id, prjItem);
 		}
 	}
 }
