@@ -6,8 +6,11 @@ interface Draggable {
 }
 
 interface DragTarget {
+	// To apply the dropEvent
 	dragOverHandler(event: DragEvent): void;
+	// Finish the drop event
 	dropHandler(event: DragEvent): void;
+	// To inform the user, whether the drop event has been successfully droped or not.
 	dragLeaveHandler(event: DragEvent): void;
 }
 
