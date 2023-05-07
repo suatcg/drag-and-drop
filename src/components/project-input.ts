@@ -1,8 +1,8 @@
-import Cmp from './base-component.js';
+import Cmp from './base-component';
 // Grouping ES modules feature.
-import * as Validation from '../util/validation.js';
-import { AutoBind } from '../decorators/autobind.js';
-import { projectState } from '../state/project-state.js';
+import * as Validation from '../util/validation';
+import { AutoBind } from '../decorators/autobind';
+import { projectState } from '../state/project-state';
 
 // Project Input Class
 export class ProjectInput extends Cmp<HTMLDivElement, HTMLFormElement> {
